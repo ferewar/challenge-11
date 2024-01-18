@@ -36,14 +36,16 @@ const getNotes = () =>
     }
   });
 
-const saveNote = (note) =>
+  const saveNote = (note) =>
   fetch('/api/notes', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify(note)
-  });
+  }).catch(error => console.error('Failed to save the note', error));
+
+
 
 const deleteNote = (id) =>
   fetch(`/api/notes/${id}`, {
@@ -51,7 +53,7 @@ const deleteNote = (id) =>
     headers: {
       'Content-Type': 'application/json'
     }
-  });
+  }).catch(error => console.error('Failed to delete the note', error));
 
 const renderActiveNote = () => {
   hide(saveNoteBtn);
@@ -77,10 +79,15 @@ const handleNoteSave = () => {
     title: noteTitle.value,
     text: noteText.value
   };
-  saveNote(newNote).then(() => {
-    getAndRenderNotes();
-    renderActiveNote();
-  });
+  saveNote(newNote)
+    .then(response => response.json())
+    .then(data => {
+      getAndRenderNotes();
+      renderActiveNote();
+    })
+    .catch((error) => {
+      console.error('Failed to save note', error);
+    });
 };
 
 // Delete the clicked note
@@ -129,9 +136,26 @@ const handleRenderBtns = () => {
 
 // Render the list of note titles
 const renderNoteList = async (notes) => {
-  let jsonNotes = await notes.json();
+  let jsonNotes;
+  try {
+    jsonNotes = await notes.json(); // Attempt to parse the incoming notes as JSON.
+  } catch (error) {
+    console.error("Failed to parse notes as JSON", error);
+    return;
+  }
+
+  if (!Array.isArray(jsonNotes)) {
+    console.error("Expected an array of notes, but got:", jsonNotes);
+    return;
+  }
+
+  // Clear the existing notes
   if (window.location.pathname === '/notes') {
-    noteList.forEach((el) => (el.innerHTML = ''));
+    noteList.forEach(list => {
+      while (list.firstChild) {
+        list.removeChild(list.firstChild);
+      }
+    });
   }
 
   let noteListItems = [];
@@ -182,13 +206,16 @@ const renderNoteList = async (notes) => {
 };
 
 // Gets notes from the db and renders them to the sidebar
-const getAndRenderNotes = () => getNotes().then(renderNoteList);
-
+const getAndRenderNotes = () => getNotes().then(renderNoteList).catch((error) => {
+  console.error("Failed to get and render notes", error);
+});
+getAndRenderNotes();
 if (window.location.pathname === '/notes') {
   saveNoteBtn.addEventListener('click', handleNoteSave);
   newNoteBtn.addEventListener('click', handleNewNoteView);
   clearBtn.addEventListener('click', renderActiveNote);
   noteForm.addEventListener('input', handleRenderBtns);
+  
 }
 
 getAndRenderNotes();
